@@ -94,7 +94,6 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
     //
     switch (msg)
     {
-
     case SBG_ECOM_LOG_EKF_EULER:
       // Format the string using sprintf
       sprintf(buffer, "Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f   \n",
@@ -214,7 +213,7 @@ static SbgErrorCode SBG_RunProcess(SbgInterface *pInterface)
     //   SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
     // }
 
-    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_200);
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_40);
 
     if (errorCode != SBG_NO_ERROR)
     {
@@ -225,14 +224,13 @@ static SbgErrorCode SBG_RunProcess(SbgInterface *pInterface)
 
     if (errorCode != SBG_NO_ERROR)
     {
-      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_GPS1_POS log");
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_GPS2_POS log");
     }
 
     //
     // Define callbacks for received data and display header
     //
     sbgEComSetReceiveLogCallback(&comHandle, onLogReceived, NULL);
-    printf("Euler Angles display with estimated standard deviation - degrees\n");
 
     //
     // Loop until the user exist
