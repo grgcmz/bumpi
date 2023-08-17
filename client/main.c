@@ -18,11 +18,13 @@
 
 static unsigned char buf[BUFSIZE]; /* receive buffer */
 const char *host = "127.0.0.1";    /* IP of host */
-const int port = 1235;             /* port to be used */
+const int port = 1234;             /* port to be used */
 static struct sockaddr_in myaddr;  /* our own address */
 static struct sockaddr_in remaddr; /* remote address */
 static int fd, i;
 static socklen_t slen;
+
+const char *testmsg = "test!";
 
 static int udp_init(void)
 {
@@ -86,19 +88,38 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
 
   if (msgClass == SBG_ECOM_CLASS_LOG_ECOM_0)
   {
+    char buffer[256]; // Adjust the buffer size as needed
     //
     // Handle separately each received data according to the log ID
     //
     switch (msg)
     {
+
     case SBG_ECOM_LOG_EKF_EULER:
-      //
-      // Simply display euler angles in real time
-      //
-      printf("Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f   \r",
-             sbgRadToDegf(pLogData->ekfEulerData.euler[0]), sbgRadToDegf(pLogData->ekfEulerData.euler[1]), sbgRadToDegf(pLogData->ekfEulerData.euler[2]),
-             sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[0]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[1]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[2]));
+      // Format the string using sprintf
+      sprintf(buffer, "Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f   \n",
+              sbgRadToDegf(pLogData->ekfEulerData.euler[0]), sbgRadToDegf(pLogData->ekfEulerData.euler[1]), sbgRadToDegf(pLogData->ekfEulerData.euler[2]),
+              sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[0]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[1]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[2]));
+
+      // Send the formatted string using sendto
+      if (sendto(fd, buffer, strlen(buffer), 0, (struct sockaddr *)&remaddr, slen) == -1)
+      {
+        perror("sendto");
+        return -1;
+      }
       break;
+    case SBG_ECOM_LOG_GPS1_POS:
+      // Format the string using sprintf
+      sprintf(buffer, "GPS1_POS: %4.8f\n", pLogData->gpsPosData.latitude);
+
+      // Send the formatted string using sendto
+      if (sendto(fd, buffer, strlen(buffer), 0, (struct sockaddr *)&remaddr, slen) == -1)
+      {
+        perror("sendto");
+        return -1;
+      }
+      break;
+
     default:
       break;
     }
@@ -159,7 +180,7 @@ static SbgErrorCode getAndPrintProductInfo(SbgEComHandle *pECom)
  * \param[in]	pInterface							Interface used to communicate with the device.
  * \return											SBG_NO_ERROR if successful.
  */
-static SbgErrorCode ellipseMinimalProcess(SbgInterface *pInterface)
+static SbgErrorCode SBG_RunProcess(SbgInterface *pInterface)
 {
   SbgErrorCode errorCode = SBG_NO_ERROR;
   SbgEComHandle comHandle;
@@ -186,18 +207,25 @@ static SbgErrorCode ellipseMinimalProcess(SbgInterface *pInterface)
     //
     // Showcase how to configure some output logs to 25 Hz, don't stop if there is an error
     //
-    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_IMU_DATA, SBG_ECOM_OUTPUT_MODE_DIV_8);
+    // errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_IMU_DATA, SBG_ECOM_OUTPUT_MODE_DIV_200);
 
-    if (errorCode != SBG_NO_ERROR)
-    {
-      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
-    }
+    // if (errorCode != SBG_NO_ERROR)
+    // {
+    //   SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
+    // }
 
-    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_8);
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_200);
 
     if (errorCode != SBG_NO_ERROR)
     {
       SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_EKF_EULER log");
+    }
+
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_GPS1_POS, SBG_ECOM_OUTPUT_MODE_DIV_200);
+
+    if (errorCode != SBG_NO_ERROR)
+    {
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_GPS1_POS log");
     }
 
     //
@@ -257,7 +285,7 @@ static SbgErrorCode sbg_init(void)
 
   if (errorCode == SBG_NO_ERROR)
   {
-    errorCode = ellipseMinimalProcess(&sbgInterface);
+    errorCode = SBG_RunProcess(&sbgInterface);
 
     if (errorCode == SBG_NO_ERROR)
     {
