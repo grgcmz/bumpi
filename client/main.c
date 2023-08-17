@@ -2,26 +2,31 @@
 #include <sys/socket.h> /* sockets */
 #include <arpa/inet.h>  /* address conversions */
 #include <unistd.h>
-#include <string.h>   /* memset, strlen */
-#include <stdio.h>    /* printf */
+#include <string.h> /* memset, strlen */
+#include <stdio.h>  /* printf */
 
-#define BUFSIZE (10*1024) /* size of buffer, max 64 KByte */
+
+
+#define BUFSIZE (10 * 1024) /* size of buffer, max 64 KByte */
 
 static unsigned char buf[BUFSIZE]; /* receive buffer */
+const char *host = "127.0.0.1";    /* IP of host */
+const int port = 1235;             /* port to be used */
+static struct sockaddr_in myaddr;  /* our own address */
+static struct sockaddr_in remaddr; /* remote address */
+static int fd, i;
+static socklen_t slen;
 
-int main(void) {
-  struct sockaddr_in myaddr; /* our own address */
-  struct sockaddr_in remaddr; /* remote address */
-  int fd, i;
-  socklen_t slen=sizeof(remaddr);
-  int recvlen;    /* # bytes in acknowledgment message */
-  int port = 1235; /* port to be used */
-  const char *msg = "test!";
-  const char *host = "127.0.0.1"; /* IP of host */
+static int udp_init(void)
+{
+  slen = sizeof(remaddr);
+  int recvlen; /* # bytes in acknowledgment message */
+
   char ipBuf[64]; /* in case 'host' is a hostname and not an IP address, this will hold the IP address */
 
   /* create a socket */
-  if ((fd=socket(AF_INET, SOCK_DGRAM, 0))==-1) {
+  if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+  {
     printf("socket created\n");
   }
 
@@ -31,7 +36,8 @@ int main(void) {
   myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   myaddr.sin_port = htons(0);
 
-  if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+  if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0)
+  {
     perror("bind failed");
     return -1;
   }
@@ -39,22 +45,39 @@ int main(void) {
   /* now define remaddr, the address to whom we want to send messages */
   /* For convenience, the host address is expressed as a numeric IP address */
   /* that we will convert to a binary format via inet_aton */
-  memset((char *) &remaddr, 0, sizeof(remaddr));
+  memset((char *)&remaddr, 0, sizeof(remaddr));
   remaddr.sin_family = AF_INET;
   remaddr.sin_port = htons(port);
-  if (inet_aton(host, &remaddr.sin_addr)==0) {
+  if (inet_aton(host, &remaddr.sin_addr) == 0)
+  {
     fprintf(stderr, "inet_aton() failed\n");
     return -1;
   }
+  return 0;
+}
+
+static int sbg_init(void){
+  return 0;
+}
+
+int main(void)
+{
+  udp_init();
+  sbg_init();
+
+  const char *msg = "test!";
 
   /* now let's send the messages */
-  printf("Sending datagram '%s' to '%s' on port %d\n", msg, host, port);
-  if (sendto(fd, msg, strlen(msg), 0, (struct sockaddr *)&remaddr, slen)==-1) {
-    perror("sendto");
-    return -1;
+  for (;;)
+  {
+    printf("Sending datagram '%s' to '%s' on port %d\n", msg, host, port);
+    if (sendto(fd, msg, strlen(msg), 0, (struct sockaddr *)&remaddr, slen) == -1)
+    {
+      perror("sendto");
+      return -1;
+    }
   }
 
   close(fd);
   return 0; /* ok */
 }
-
