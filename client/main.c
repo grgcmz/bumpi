@@ -96,7 +96,7 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
     {
     case SBG_ECOM_LOG_EKF_EULER:
       // Format the string using sprintf
-      sprintf(buffer, "Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f   \n",
+      sprintf(buffer, "Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f",
               sbgRadToDegf(pLogData->ekfEulerData.euler[0]), sbgRadToDegf(pLogData->ekfEulerData.euler[1]), sbgRadToDegf(pLogData->ekfEulerData.euler[2]),
               sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[0]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[1]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[2]));
 
@@ -109,7 +109,7 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
       break;
     case SBG_ECOM_LOG_GPS1_POS:
       // Format the string using sprintf
-      sprintf(buffer, "GPS1_POS: %4.8f\n", pLogData->gpsPosData.latitude);
+      sprintf(buffer, "time:%d lat:%4.5f lon:%4.5f", (uint32_t)pLogData->utcData.timeStamp, pLogData->gpsPosData.latitude, pLogData->gpsPosData.longitude);
 
       // Send the formatted string using sendto
       if (sendto(fd, buffer, strlen(buffer), 0, (struct sockaddr *)&remaddr, slen) == -1)
