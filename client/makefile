@@ -5,6 +5,8 @@ LINK_TARGET = $(OBJ_DIR)udpclient
 DEPEND_OPTS = -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)"
 SRC_DIR = ./
 OBJ_DIR = ./
+INCLUDE_DIRS = /includes/sbgECom/src/ /includes/sbgECom/common/
+
 OBJS = \
 	$(OBJ_DIR)main.o
 ############################
@@ -34,7 +36,7 @@ clean:
 # $@ matches the target
 # $< matches the first dependent
 $(OBJ_DIR)%.o: $(SRC_DIR)%.c
-	$(CC) $(DEPEND_OPTS) -g3 -c "$<" -o "$@" 
+	$(CC) $(DEPEND_OPTS) -g3 -c $(addprefix -I,$(INCLUDE_DIRS)) "$<" -o "$@" 
 
 $(LINK_TARGET): $(OBJS)
 	$(CC) $(OBJS) -ggdb -o $@

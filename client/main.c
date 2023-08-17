@@ -5,9 +5,16 @@
 #include <string.h> /* memset, strlen */
 #include <stdio.h>  /* printf */
 
+// sbgCommonLib headers
+#include <sbgCommon.h>
+#include <version/sbgVersion.h>
 
+// sbgECom headers
+#include <sbgEComLib.h>
 
 #define BUFSIZE (10 * 1024) /* size of buffer, max 64 KByte */
+#define SBG_DEVICENAME ("/dev/ttyUSB0")
+#define SBG_BAUDRATE (115200)
 
 static unsigned char buf[BUFSIZE]; /* receive buffer */
 const char *host = "127.0.0.1";    /* IP of host */
@@ -56,8 +63,220 @@ static int udp_init(void)
   return 0;
 }
 
-static int sbg_init(void){
-  return 0;
+//----------------------------------------------------------------------//
+//- Private methods                                                    -//
+//----------------------------------------------------------------------//
+
+/*!
+ *	Callback definition called each time a new log is received.
+ *
+ *	\param[in]	pHandle									Valid handle on the sbgECom instance that has called this callback.
+ *	\param[in]	msgClass								Class of the message we have received
+ *	\param[in]	msg										Message ID of the log received.
+ *	\param[in]	pLogData								Contains the received log data as an union.
+ *	\param[in]	pUserArg								Optional user supplied argument.
+ *	\return												SBG_NO_ERROR if the received log has been used successfully.
+ */
+SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgEComMsgId msg, const SbgBinaryLogData *pLogData, void *pUserArg)
+{
+  assert(pLogData);
+
+  SBG_UNUSED_PARAMETER(pHandle);
+  SBG_UNUSED_PARAMETER(pUserArg);
+
+  if (msgClass == SBG_ECOM_CLASS_LOG_ECOM_0)
+  {
+    //
+    // Handle separately each received data according to the log ID
+    //
+    switch (msg)
+    {
+    case SBG_ECOM_LOG_EKF_EULER:
+      //
+      // Simply display euler angles in real time
+      //
+      printf("Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f   \r",
+             sbgRadToDegf(pLogData->ekfEulerData.euler[0]), sbgRadToDegf(pLogData->ekfEulerData.euler[1]), sbgRadToDegf(pLogData->ekfEulerData.euler[2]),
+             sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[0]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[1]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[2]));
+      break;
+    default:
+      break;
+    }
+  }
+
+  return SBG_NO_ERROR;
+}
+
+/*!
+ * Get and print product info.
+ *
+ * \param[in]	pECom					SbgECom instance.
+ * \return								SBG_NO_ERROR if successful.
+ */
+static SbgErrorCode getAndPrintProductInfo(SbgEComHandle *pECom)
+{
+  SbgErrorCode errorCode;
+  SbgEComDeviceInfo deviceInfo;
+
+  assert(pECom);
+
+  //
+  // Get device inforamtions
+  //
+  errorCode = sbgEComCmdGetInfo(pECom, &deviceInfo);
+
+  //
+  // Display device information if no error
+  //
+  if (errorCode == SBG_NO_ERROR)
+  {
+    char calibVersionStr[32];
+    char hwRevisionStr[32];
+    char fmwVersionStr[32];
+
+    sbgVersionToStringEncoded(deviceInfo.calibationRev, calibVersionStr, sizeof(calibVersionStr));
+    sbgVersionToStringEncoded(deviceInfo.hardwareRev, hwRevisionStr, sizeof(hwRevisionStr));
+    sbgVersionToStringEncoded(deviceInfo.firmwareRev, fmwVersionStr, sizeof(fmwVersionStr));
+
+    printf("      Serial Number: %0.9" PRIu32 "\n", deviceInfo.serialNumber);
+    printf("       Product Code: %s\n", deviceInfo.productCode);
+    printf("  Hardware Revision: %s\n", hwRevisionStr);
+    printf("   Firmware Version: %s\n", fmwVersionStr);
+    printf("     Calib. Version: %s\n", calibVersionStr);
+    printf("\n");
+  }
+  else
+  {
+    SBG_LOG_WARNING(errorCode, "Unable to retrieve device information");
+  }
+
+  return errorCode;
+}
+
+/*!
+ * Execute the ellipseMinimal example given an opened and valid interface.
+ *
+ * \param[in]	pInterface							Interface used to communicate with the device.
+ * \return											SBG_NO_ERROR if successful.
+ */
+static SbgErrorCode ellipseMinimalProcess(SbgInterface *pInterface)
+{
+  SbgErrorCode errorCode = SBG_NO_ERROR;
+  SbgEComHandle comHandle;
+
+  assert(pInterface);
+
+  //
+  // Create the sbgECom library and associate it with the created interfaces
+  //
+  errorCode = sbgEComInit(&comHandle, pInterface);
+
+  //
+  // Test that the sbgECom has been initialized
+  //
+  if (errorCode == SBG_NO_ERROR)
+  {
+    printf("sbgECom version %s\n\n", SBG_E_COM_VERSION_STR);
+
+    //
+    // Query and display produce info, don't stop if there is an error
+    //
+    getAndPrintProductInfo(&comHandle);
+
+    //
+    // Showcase how to configure some output logs to 25 Hz, don't stop if there is an error
+    //
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_IMU_DATA, SBG_ECOM_OUTPUT_MODE_DIV_8);
+
+    if (errorCode != SBG_NO_ERROR)
+    {
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
+    }
+
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_8);
+
+    if (errorCode != SBG_NO_ERROR)
+    {
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_EKF_EULER log");
+    }
+
+    //
+    // Define callbacks for received data and display header
+    //
+    sbgEComSetReceiveLogCallback(&comHandle, onLogReceived, NULL);
+    printf("Euler Angles display with estimated standard deviation - degrees\n");
+
+    //
+    // Loop until the user exist
+    //
+    while (1)
+    {
+      //
+      // Try to read a frame
+      //
+      errorCode = sbgEComHandle(&comHandle);
+
+      //
+      // Test if we have to release some CPU (no frame received)
+      //
+      if (errorCode == SBG_NOT_READY)
+      {
+        //
+        // Release CPU
+        //
+        sbgSleep(1);
+      }
+      else
+      {
+        SBG_LOG_ERROR(errorCode, "Unable to process incoming sbgECom logs");
+      }
+    }
+
+    //
+    // Close the sbgEcom library
+    //
+    sbgEComClose(&comHandle);
+  }
+  else
+  {
+    SBG_LOG_ERROR(errorCode, "Unable to initialize the sbgECom library");
+  }
+
+  return errorCode;
+}
+
+static SbgErrorCode sbg_init(void)
+{
+  SbgErrorCode errorCode = SBG_NO_ERROR;
+  SbgInterface sbgInterface;
+  int exitCode;
+  //
+  // Create a serial interface to communicate with the PULSE
+  //
+  errorCode = sbgInterfaceSerialCreate(&sbgInterface, SBG_DEVICENAME, SBG_BAUDRATE);
+
+  if (errorCode == SBG_NO_ERROR)
+  {
+    errorCode = ellipseMinimalProcess(&sbgInterface);
+
+    if (errorCode == SBG_NO_ERROR)
+    {
+      exitCode = EXIT_SUCCESS;
+    }
+    else
+    {
+      exitCode = EXIT_FAILURE;
+    }
+
+    sbgInterfaceDestroy(&sbgInterface);
+  }
+  else
+  {
+    SBG_LOG_ERROR(errorCode, "unable to open serial interface");
+    exitCode = EXIT_FAILURE;
+  }
+
+  return exitCode;
 }
 
 int main(void)
