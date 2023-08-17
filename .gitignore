@@ -52,5 +52,5 @@ Mkfile.old
 dkms.conf
 
 # SBG sbgECom Library
-./sbgECom/*
+./client/includes/sbgECom/*
 client/udpclient
