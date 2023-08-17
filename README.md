@@ -1,2 +1,2 @@
-# BumPi
-## Boden UnebenheitsMessgerät mit raspberryPI
+# BumPi 
+**B**oden **U**nebenheits**M**essgerät mit raspberry**PI**
