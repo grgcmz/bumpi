@@ -54,3 +54,4 @@ dkms.conf
 # SBG sbgECom Library
 ./client/includes/sbgECom/*
 client/udpclient
+client/build/*
