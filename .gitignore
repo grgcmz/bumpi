@@ -55,3 +55,6 @@ dkms.conf
 ./client/includes/sbgECom/*
 client/udpclient
 client/build/*
+server/__pycache__/sbg_server.cpython-39.pyc
+server/__pycache__/webserver.cpython-39.pyc
+.gitignore
