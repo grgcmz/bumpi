@@ -17,14 +17,31 @@
 #define SBG_BAUDRATE (115200)
 
 static unsigned char buf[BUFSIZE]; /* receive buffer */
-const char *host = "127.0.0.1";    /* IP of host */
-const int port = 1234;             /* port to be used */
+const char *host = "192.168.135.197";    /* IP of host */
+const int port = 1235;             /* port to be used */
 static struct sockaddr_in myaddr;  /* our own address */
 static struct sockaddr_in remaddr; /* remote address */
 static int fd, i;
 static socklen_t slen;
 
 const char *testmsg = "test!";
+
+struct Message_s
+{
+  uint16_t year;
+  uint8_t month;
+  uint8_t day;
+  uint8_t hour;
+  uint8_t minute;
+  uint8_t second;
+  uint32_t nanosecond;
+
+  double euler[3];
+  double altitude;
+  double latitude;
+  double longitude;
+
+} message;
 
 static int udp_init(void)
 {
@@ -88,7 +105,6 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
 
   if (msgClass == SBG_ECOM_CLASS_LOG_ECOM_0)
   {
-    char buffer[256]; // Adjust the buffer size as needed
     //
     // Handle separately each received data according to the log ID
     //
@@ -96,31 +112,29 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
     {
     case SBG_ECOM_LOG_EKF_EULER:
       // Format the string using sprintf
-      sprintf(buffer, "Euler Angles: %3.1f\t%3.1f\t%3.1f\tStd Dev:%3.1f\t%3.1f\t%3.1f",
-              sbgRadToDegf(pLogData->ekfEulerData.euler[0]), sbgRadToDegf(pLogData->ekfEulerData.euler[1]), sbgRadToDegf(pLogData->ekfEulerData.euler[2]),
-              sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[0]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[1]), sbgRadToDegf(pLogData->ekfEulerData.eulerStdDev[2]));
-
-      // Send the formatted string using sendto
-      if (sendto(fd, buffer, strlen(buffer), 0, (struct sockaddr *)&remaddr, slen) == -1)
-      {
-        perror("sendto");
-        return -1;
-      }
+      message.euler[0] = pLogData->ekfEulerData.euler[0];
+      message.euler[1] = pLogData->ekfEulerData.euler[1];
+      message.euler[2] = pLogData->ekfEulerData.euler[2];
       break;
     case SBG_ECOM_LOG_GPS1_POS:
-      // Format the string using sprintf
-      sprintf(buffer, "time:%d lat:%4.5f lon:%4.5f", (uint32_t)pLogData->utcData.timeStamp, pLogData->gpsPosData.latitude, pLogData->gpsPosData.longitude);
-
-      // Send the formatted string using sendto
-      if (sendto(fd, buffer, strlen(buffer), 0, (struct sockaddr *)&remaddr, slen) == -1)
-      {
-        perror("sendto");
-        return -1;
-      }
+      message.altitude = pLogData->gpsPosData.altitude;
+      message.latitude = pLogData->gpsPosData.latitude;
+      message.longitude = pLogData->gpsPosData.longitude;
       break;
 
     default:
       break;
+    }
+    // Serialize the struct into a byte buffer
+    uint8_t buffer[sizeof(struct Message_s)];
+    memcpy(buffer, &message, sizeof(struct Message_s));
+
+    // Send the byte buffer using sendto
+    ssize_t sentBytes = sendto(fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&remaddr, slen);
+    if (sentBytes == -1)
+    {
+      perror("sendto");
+      return -1;
     }
   }
 
