@@ -29,6 +29,7 @@ const char *testmsg = "test!";
 
 struct Message_s
 {
+  /* SBG_ECOM_LOG_UTC_TIME */
   uint16_t year;
   int8_t month;
   uint8_t day;
@@ -37,12 +38,42 @@ struct Message_s
   uint8_t second;
   int32_t nanosecond;
 
-  double euler[3];
+  /* SBG_ECOM_LOG_IMU_DATA */
+  float accel[3];
+  float gyro[3];
+  float temperature;
+  float deltaVelocity[3];
+  float deltaAngle[3];
+
+  /* SBG_ECOM_LOG_GPS1_POS */
   double altitude;
   double latitude;
   double longitude;
 
 } message;
+
+static void printMessage(const struct Message_s *msg) {
+    printf("\033[2J"); // Clear the screen
+    printf("\033[H");  // Move cursor to top-left
+
+    printf("Received Message:\n");
+
+    printf("Date: %d-%02d-%02d %02d:%02d:%02d.%09d\n",
+           msg->year, msg->month, msg->day,
+           msg->hour, msg->minute, msg->second, msg->nanosecond);
+
+    printf("Accelerometer: %f %f %f\n", msg->accel[0], msg->accel[1], msg->accel[2]);
+    printf("Gyroscope: %f %f %f\n", msg->gyro[0], msg->gyro[1], msg->gyro[2]);
+    printf("Temperature: %f\n", msg->temperature);
+    printf("Delta Velocity: %f %f %f\n", msg->deltaVelocity[0], msg->deltaVelocity[1], msg->deltaVelocity[2]);
+    printf("Delta Angle: %f %f %f\n", msg->deltaAngle[0], msg->deltaAngle[1], msg->deltaAngle[2]);
+
+    printf("Altitude: %f\n", msg->altitude);
+    printf("Latitude: %f\n", msg->latitude);
+    printf("Longitude: %f\n", msg->longitude);
+
+    fflush(stdout); // Flush output
+}
 
 static int udp_init(void)
 {
@@ -131,15 +162,25 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
         perror("sendto");
         return -1;
       }
+      
+      break;
+    
+    case SBG_ECOM_LOG_IMU_DATA:
+      message.accel[0] = pLogData->imuData.accelerometers[0];
+      message.accel[1] = pLogData->imuData.accelerometers[1];
+      message.accel[2] = pLogData->imuData.accelerometers[2];
+      message.gyro[0] = pLogData->imuData.gyroscopes[0];
+      message.gyro[1] = pLogData->imuData.gyroscopes[1];
+      message.gyro[2] = pLogData->imuData.gyroscopes[2];
+      message.temperature = pLogData->imuData.temperature;
+      message.deltaVelocity[0] = pLogData->imuData.deltaVelocity[0];
+      message.deltaVelocity[1] = pLogData->imuData.deltaVelocity[1];
+      message.deltaVelocity[2] = pLogData->imuData.deltaVelocity[2];
+      message.deltaAngle[0] = pLogData->imuData.deltaAngle[0];
+      message.deltaAngle[1] = pLogData->imuData.deltaAngle[1];
+      message.deltaAngle[2] = pLogData->imuData.deltaAngle[2];
       break;
 
-    case SBG_ECOM_LOG_EKF_EULER:
-      // Format the string using sprintf
-      message.euler[0] = pLogData->ekfEulerData.euler[0];
-      message.euler[1] = pLogData->ekfEulerData.euler[1];
-      message.euler[2] = pLogData->ekfEulerData.euler[2];
-      break;
-      
     case SBG_ECOM_LOG_GPS1_POS:
       message.altitude = pLogData->gpsPosData.altitude;
       message.latitude = pLogData->gpsPosData.latitude;
@@ -230,21 +271,21 @@ static SbgErrorCode SBG_RunProcess(SbgInterface *pInterface)
     //
     getAndPrintProductInfo(&comHandle);
 
-    //
+    
     // Showcase how to configure some output logs to 25 Hz, don't stop if there is an error
-    //
-    // errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_IMU_DATA, SBG_ECOM_OUTPUT_MODE_DIV_200);
-
-    // if (errorCode != SBG_NO_ERROR)
-    // {
-    //   SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
-    // }
-
-    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_EKF_EULER, SBG_ECOM_OUTPUT_MODE_DIV_40);
+    
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_UTC_TIME, SBG_ECOM_OUTPUT_MODE_DIV_40);
 
     if (errorCode != SBG_NO_ERROR)
     {
-      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_EKF_EULER log");
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
+    }
+
+    errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_IMU_DATA, SBG_ECOM_OUTPUT_MODE_DIV_40);
+
+    if (errorCode != SBG_NO_ERROR)
+    {
+      SBG_LOG_WARNING(errorCode, "Unable to configure SBG_ECOM_LOG_IMU_DATA log");
     }
 
     errorCode = sbgEComCmdOutputSetConf(&comHandle, SBG_ECOM_OUTPUT_PORT_A, SBG_ECOM_CLASS_LOG_ECOM_0, SBG_ECOM_LOG_GPS1_POS, SBG_ECOM_OUTPUT_MODE_DIV_200);
