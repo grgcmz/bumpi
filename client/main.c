@@ -16,8 +16,9 @@
 #define SBG_DEVICENAME ("/dev/ttyUSB0")
 #define SBG_BAUDRATE (115200)
 
-static unsigned char buf[BUFSIZE]; /* receive buffer */
-const char *host = "192.168.135.197";    /* IP of host */
+static unsigned char buf[BUFSIZE];    /* receive buffer */
+const char *host = "192.168.135.237"; /* IP of host */
+// const char *host = "127.0.0.1";  /* IP of localhost */
 const int port = 1235;             /* port to be used */
 static struct sockaddr_in myaddr;  /* our own address */
 static struct sockaddr_in remaddr; /* remote address */
@@ -29,12 +30,12 @@ const char *testmsg = "test!";
 struct Message_s
 {
   uint16_t year;
-  uint8_t month;
+  int8_t month;
   uint8_t day;
   uint8_t hour;
   uint8_t minute;
   uint8_t second;
-  uint32_t nanosecond;
+  int32_t nanosecond;
 
   double euler[3];
   double altitude;
@@ -110,12 +111,35 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
     //
     switch (msg)
     {
+    case SBG_ECOM_LOG_UTC_TIME:
+      message.year = pLogData->utcData.year;
+      message.month = pLogData->utcData.month;
+      message.day = pLogData->utcData.day;
+      message.hour = pLogData->utcData.hour;
+      message.minute = pLogData->utcData.minute;
+      message.second = pLogData->utcData.second;
+      message.nanosecond = pLogData->utcData.nanoSecond;
+
+      // Serialize the struct into a byte buffer
+      uint8_t buffer[sizeof(struct Message_s)];
+      memcpy(buffer, &message, sizeof(struct Message_s));
+
+      // Send the byte buffer using sendto
+      ssize_t sentBytes = sendto(fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&remaddr, slen);
+      if (sentBytes == -1)
+      {
+        perror("sendto");
+        return -1;
+      }
+      break;
+
     case SBG_ECOM_LOG_EKF_EULER:
       // Format the string using sprintf
       message.euler[0] = pLogData->ekfEulerData.euler[0];
       message.euler[1] = pLogData->ekfEulerData.euler[1];
       message.euler[2] = pLogData->ekfEulerData.euler[2];
       break;
+      
     case SBG_ECOM_LOG_GPS1_POS:
       message.altitude = pLogData->gpsPosData.altitude;
       message.latitude = pLogData->gpsPosData.latitude;
@@ -124,17 +148,6 @@ SbgErrorCode onLogReceived(SbgEComHandle *pHandle, SbgEComClass msgClass, SbgECo
 
     default:
       break;
-    }
-    // Serialize the struct into a byte buffer
-    uint8_t buffer[sizeof(struct Message_s)];
-    memcpy(buffer, &message, sizeof(struct Message_s));
-
-    // Send the byte buffer using sendto
-    ssize_t sentBytes = sendto(fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&remaddr, slen);
-    if (sentBytes == -1)
-    {
-      perror("sendto");
-      return -1;
     }
   }
 
